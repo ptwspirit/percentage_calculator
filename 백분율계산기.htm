@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>백분율 계산기</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      max-width: 550px;
+      margin: 40px auto;
+    }
+    input {
+      padding: 8px;
+      margin: 5px 0;
+      width: 100%;
+      box-sizing: border-box;
+      font-size: 1em;
+    }
+    button {
+      padding: 10px;
+      width: 100%;
+      margin-top: 10px;
+      cursor: pointer;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px 12px;
+      text-align: center;
+    }
+    th {
+      background-color: #f0f0f0;
+    }
+    .bold {
+      font-weight: bold;
+      background-color: #e0e0e0;
+    }
+    #readableValue {
+      margin-bottom: 10px;
+      color: #444;
+      font-size: 0.95em;
+      min-height: 24px;
+    }
+  </style>
+</head>
+<body>
+  <h2>백분율 계산기</h2>
+
+  <label for="baseValue">원본값:</label>
+  <input
+    type="text"
+    id="baseValue"
+    placeholder="예: 3,000,000,000.50"
+    value="300"
+    oninput="onBaseValueInput(this)"
+  />
+  <div id="readableValue"></div>
+
+  <label for="intervalValue">간격값(%):</label>
+  <input
+    type="number"
+    id="intervalValue"
+    step="0.001"
+    placeholder="예: 5"
+    value="5"
+  />
+
+  <label for="minPercent">최소 퍼센트(%):</label>
+  <input
+    type="number"
+    id="minPercent"
+    step="0.1"
+    placeholder="예: 0"
+    value="0"
+  />
+
+  <label for="maxPercent">최대 퍼센트(%):</label>
+  <input
+    type="number"
+    id="maxPercent"
+    step="0.1"
+    placeholder="예: 200"
+    value="200"
+  />
+
+  <button onclick="calculatePercentages()">계산하기</button>
+
+  <div id="resultArea"></div>
+
+  <script>
+    let baseDecimalPlaces = 0; // 원본값 소수점 자리수 저장
+
+    function onBaseValueInput(el) {
+      let val = el.value.replace(/,/g, '');
+      if (val === '') {
+        el.value = '';
+        showReadableValue(0);
+        baseDecimalPlaces = 0;
+        return;
+      }
+      if (!/^\d*\.?\d*$/.test(val)) {
+        el.value = el.value.slice(0, -1);
+        return;
+      }
+      const num = Number(val);
+      if (isNaN(num)) {
+        el.value = '';
+        showReadableValue(0);
+        baseDecimalPlaces = 0;
+        return;
+      }
+      const parts = val.split('.');
+      baseDecimalPlaces = parts.length > 1 ? parts[1].length : 0;
+
+      parts[0] = Number(parts[0]).toLocaleString('ko-KR');
+      el.value = parts.length > 1 ? parts[0] + '.' + parts[1] : parts[0];
+      showReadableValue(num);
+    }
+
+    // 소수점 자리수를 baseDecimalPlaces에 맞춰 포맷팅
+    function formatNumberCustom(num) {
+      return Number(num).toLocaleString('ko-KR', {
+        minimumFractionDigits: baseDecimalPlaces,
+        maximumFractionDigits: baseDecimalPlaces,
+      });
+    }
+
+    function getDecimalPlaces(num) {
+      const numStr = num.toString();
+      if (numStr.includes('.')) {
+        return numStr.split('.')[1].length;
+      }
+      return 0;
+    }
+
+    function formatReadable(num) {
+      const units = [
+        { value: 1e16, symbol: '경' },
+        { value: 1e12, symbol: '조' },
+        { value: 1e8, symbol: '억' },
+        { value: 1e4, symbol: '만' },
+        { value: 1e3, symbol: '천' },
+      ];
+      let result = '';
+      let remainder = num;
+      for (const unit of units) {
+        if (remainder >= unit.value) {
+          const count = Math.floor(remainder / unit.value);
+          remainder = remainder % unit.value;
+          result += `${count}${unit.symbol} `;
+        }
+      }
+      if (remainder > 0) {
+        const remFormatted = remainder.toLocaleString('ko-KR', {
+          minimumFractionDigits: baseDecimalPlaces,
+          maximumFractionDigits: baseDecimalPlaces,
+        });
+        result += remFormatted;
+      }
+      return result.trim() || '0';
+    }
+
+    function showReadableValue(value) {
+      if (value === undefined) {
+        const baseInput = document.getElementById('baseValue').value.replace(/,/g, '');
+        value = parseFloat(baseInput) || 0;
+      }
+      const readableDiv = document.getElementById('readableValue');
+      if (isNaN(value) || value === 0) {
+        readableDiv.textContent = '';
+        return;
+      }
+      readableDiv.textContent = formatReadable(value);
+    }
+
+    function calculatePercentages() {
+      const baseInput = document.getElementById('baseValue').value.replace(/,/g, '');
+      const base = parseFloat(baseInput);
+      const interval = parseFloat(document.getElementById('intervalValue').value);
+      const minPercent = parseFloat(document.getElementById('minPercent').value);
+      const maxPercent = parseFloat(document.getElementById('maxPercent').value);
+      const resultArea = document.getElementById('resultArea');
+
+      if (
+        isNaN(base) ||
+        isNaN(interval) ||
+        isNaN(minPercent) ||
+        isNaN(maxPercent) ||
+        interval <= 0 ||
+        minPercent > maxPercent
+      ) {
+        resultArea.innerHTML = '<span style="color:red;">입력값을 확인하세요.</span>';
+        return;
+      }
+
+      const decimalPlaces = getDecimalPlaces(interval);
+
+      const percents = [];
+      const steps = Math.floor((maxPercent - minPercent) / interval);
+      for (let i = 0; i <= steps; i++) {
+        let percent = minPercent + i * interval;
+        percent = Number(percent.toFixed(decimalPlaces));
+        if (Math.abs(percent) < 1e-9) continue; // 0% 제외
+        percents.push(percent);
+      }
+
+      const has100 = percents.some(p => Math.abs(p - 100) < 1e-9);
+      if (!has100 && minPercent <= 100 && maxPercent >= 100) {
+        percents.push(100);
+      }
+
+      percents.sort((a, b) => a - b);
+
+      let resultHTML = `<table>
+        <thead>
+          <tr>
+            <th>백분율</th>
+            <th>계산값</th>
+            <th>읽기 쉬운 값</th>
+          </tr>
+        </thead>
+        <tbody>`;
+
+      for (const percent of percents) {
+        const is100 = Math.abs(percent - 100) < 1e-9;
+
+        // 100%는 무조건 정수로 출력, 나머지는 소수점 간격 자리수로
+        const percentDisplay = is100 ? '100' : percent.toFixed(decimalPlaces);
+
+        const value = base * percent / 100;
+        const valueFormatted = formatNumberCustom(value);
+        const readable = formatReadable(value);
+
+        resultHTML += `<tr${is100 ? ' class="bold"' : ''}>
+          <td>${percentDisplay}%</td>
+          <td>${valueFormatted}</td>
+          <td>${readable}</td>
+        </tr>`;
+      }
+
+      resultHTML += '</tbody></table>';
+
+      resultArea.innerHTML = resultHTML;
+    }
+
+    window.onload = () => {
+      onBaseValueInput(document.getElementById('baseValue'));
+    };
+  </script>
+</body>
+</html>
